@@ -1,3 +1,2 @@
-# WMP-product-clustering
-![](img/Overview.png)
 # product_clustering
+![](img/Overview.png)
