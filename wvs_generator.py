@@ -13,10 +13,10 @@ from scipy.sparse import dok_matrix
 
 class WVSGenerator():
     
-    def __init__(self, title_array, cleaned_title_array, w2v_model, tfidf_model):
+    def __init__(self, arr_title, cleaned_arr_title, w2v_model, tfidf_model):
         
-        self.title_array = title_array
-        self.cleaned_title_array = cleaned_title_array
+        self.arr_title = arr_title
+        self.cleaned_arr_title = cleaned_arr_title
         self.scaler = MinMaxScaler()
         
         self.w2v_model = w2v_model
@@ -39,8 +39,8 @@ class WVSGenerator():
             
             # split arr with n chunks
             arr_process_num = [i for i in range(0, n_worker)]
-            arr_chunks = np.array_split(self.title_array, n_worker)
-            arr_cleaned_chunks = np.array_split(self.cleaned_title_array, n_worker)
+            arr_chunks = np.array_split(self.arr_title, n_worker)
+            arr_cleaned_chunks = np.array_split(self.cleaned_arr_title, n_worker)
             
 
             # multi-processing
@@ -53,20 +53,20 @@ class WVSGenerator():
             total_arr_wvs = np.vstack(results)
         
         else:
-            total_arr_wvs = self._wvs_process(self.title_array, self.cleaned_title_array)
+            total_arr_wvs = self._wvs_process(self.arr_title, self.cleaned_arr_title)
             
         self.total_wvs = np.ascontiguousarray(total_arr_wvs).astype('float32')
         
         return total_arr_wvs
 
     # make feature vector
-    def make_wvs_vector(self, query_title, title_array=[], cleaned_title_array=[]):
+    def make_wvs_vector(self, query_title, arr_title=[], cleaned_arr_title=[]):
         
-        if title_array == []:
-            title_array = self.title_array
-            cleaned_title_array = self.cleaned_title_array
+        if arr_title == []:
+            arr_title = self.arr_title
+            cleaned_arr_title = self.cleaned_arr_title
         
-        word_array, value_array = self._find_word_weight(query_title, title_array, cleaned_title_array)
+        word_array, value_array = self._find_word_weight(query_title, arr_title, cleaned_arr_title)
         
         weighted_word_dict = dict(zip(word_array, value_array))
         weighted_word_dict = sorted(weighted_word_dict.items())
@@ -87,25 +87,25 @@ class WVSGenerator():
         
         return normalized_wvs_vector
     
-    def _wvs_process(self, title_array, cleaned_title_array, process_num=0):
+    def _wvs_process(self, arr_title, cleaned_arr_title, process_num=0):
         
         num = 0
-        total_count = len(title_array)
+        total_count = len(arr_title)
         
         arr_wvs = np.zeros(shape=(total_count, self.vector_size))
 
-        for query_title in tqdm(title_array):
-            wvs = self.make_wvs_vector(query_title, title_array, cleaned_title_array)
+        for query_title in tqdm(arr_title):
+            wvs = self.make_wvs_vector(query_title, arr_title, cleaned_arr_title)
             arr_wvs[num] = wvs
             num += 1
 
         return arr_wvs
 
-    def _find_word_weight(self, query_title, title_array, cleaned_title_array):
+    def _find_word_weight(self, query_title, arr_title, cleaned_arr_title):
 
         # find title inx & cleaned title
-        query_idx = np.where(title_array == query_title)[0].item(0)
-        cleaened_query_title = cleaned_title_array[query_idx]
+        query_idx = np.where(arr_title == query_title)[0].item(0)
+        cleaened_query_title = cleaned_arr_title[query_idx]
         
         query_sparse_matrix = self.tfidf_model.transform(np.array(cleaened_query_title))
         sparse_dict = dok_matrix(query_sparse_matrix)
@@ -131,8 +131,8 @@ class WVSGenerator():
     
 if __name__ == '__main__':
     
-    title_array = pd.read_csv('example/new_feat_df.csv', usecols=['title']).values
-    cleaned_title_array = pd.read_csv('example/new_feat_df.csv', usecols=['cleaned_title']).fillna('').values
+    arr_title = pd.read_csv('example/new_feat_df.csv', usecols=['title']).values
+    cleaned_arr_title = pd.read_csv('example/new_feat_df.csv', usecols=['cleaned_title']).fillna('').values
     
     # Word2vec & TFIDF model path
     WVS_PATH = 'Model/가공식품_word2vec.model'
@@ -141,13 +141,13 @@ if __name__ == '__main__':
     w2v_model = Word2Vec.load(WVS_PATH)
     tfidf_model = pickle.load(open(TFIDF_PATH, 'rb'))
     
-    vector_generator = WVSGenerator(title_array, cleaned_title_array, w2v_model, tfidf_model)
+    vector_generator = WVSGenerator(arr_title, cleaned_arr_title, w2v_model, tfidf_model)
     
     query_title = '산고추 고추절임 업소용식자재 (500gX10개) 한푸드'
     
-    title_vector = vector_generator.make_wvs_vector(query_title)
+    query_vector = vector_generator.make_wvs_vector(query_title)
     
-    print(title_vector)
+    print(query_vector)
     
 # output (vector_size):
 # [[0.7993041  0.45954755 0.43287463 0.58399381 0.62696965 0.41444568

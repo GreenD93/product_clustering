@@ -32,18 +32,18 @@ def evaluate_performance(get, origin, tmp_origin, tmp_get):
     prec = (len(get)-len(tmp_get))/len(get)
     return acc, prec
 
-def cal_cosine_similarity(find_vector,sim_title_vector):
-    similarity_array = np.ones(len(sim_title_vector))
+def cal_cosine_similarity(find_vector,sim_query_vector):
+    similarity_array = np.ones(len(sim_query_vector))
 
-    for num, sim_vector in enumerate(sim_title_vector):
+    for num, sim_vector in enumerate(sim_query_vector):
         similarity = np.inner(find_vector, sim_vector) / (np.linalg.norm(find_vector) * np.linalg.norm(sim_vector))
         similarity_array[num] = similarity
 
     return similarity_array
 
-def find_answer(find_title, total_df):
+def find_answer(query_title, total_df):
 
-    find_df = total_df[total_df['title'] == find_title]
+    find_df = total_df[total_df['title'] == query_title]
     groupNo, groupCnt = find_df['group_no'].iloc[0], find_df['group_cnt'].iloc[0]
 
     # # 정답 제목
@@ -51,74 +51,74 @@ def find_answer(find_title, total_df):
 
     return origin
 
-def weight_filter(find_weight, sim_weight_array, sim_idx):
-    equal_weight_array = np.where(sim_weight_array == find_weight)[0]
-    final_sim_array = sim_idx[equal_weight_array]
+def weight_filter(find_weight, sim_arr_weight, sim_idx):
+    equal_arr_weight = np.where(sim_arr_weight == find_weight)[0]
+    final_sim_array = sim_idx[equal_arr_weight]
     return final_sim_array
 
 # intersection
-def evaluate_model(find_title, total_df, title_array, img_index, title_index, img_vector, title_vector, img_thrshold=0.1, title_threshold=0.1, weight_check=True):
-    origin = find_answer(find_title, total_df)
+def evaluate_model(query_title, total_df, arr_title, img_index, title_index, img_vector, query_vector, img_thrshold=0.1, title_threshold=0.1, weight_check=True):
+    origin = find_answer(query_title, total_df)
     # 예측 array
-    sim_index_array, get = find_intersection(find_title, title_array, img_index, title_index, img_vector, title_vector, img_thrshold, title_threshold)
+    arr_sim_index, get = find_intersection(query_title, arr_title, img_index, title_index, img_vector, query_vector, img_thrshold, title_threshold)
 
     ## 2 필터링 (중량)
     if weight_check:
-        find_weight = total_df[total_df['title'] == find_title].weight.iloc[0]
+        find_weight = total_df[total_df['title'] == query_title].weight.iloc[0]
         if str(find_weight) == 'nan':
             weight_check = False
 
     if weight_check:
-        sim_weight_array = total_df.weight[sim_index_array]
-        sim_index_array = weight_filter(find_weight,sim_weight_array,sim_index_array)
+        sim_arr_weight = total_df.weight[arr_sim_index]
+        arr_sim_index = weight_filter(find_weight,sim_arr_weight,arr_sim_index)
 
-    get = title_array[sim_index_array]
+    get = arr_title[arr_sim_index]
     tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
     acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
 
     return acc, prec
 
-def title_evaluate_model(find_title, total_df, title_array, title_index, title_vector, title_threshold=0.1, weight_check=True):
+def title_evaluate_model(query_title, total_df, arr_title, title_index, query_vector, title_threshold=0.1, weight_check=True):
 
-    origin = find_answer(find_title, total_df)
+    origin = find_answer(query_title, total_df)
 
     # 예측 array
-    title_sim_idx, title_sim_titles, title_scores = search_range_index(find_title, title_array, title_index, title_vector, title_threshold)
+    title_sim_idx, title_sim_titles, title_scores = search_range_index(query_title, arr_title, title_index, query_vector, title_threshold)
 
     ## 2 필터링 (중량)
     if weight_check:
-        find_weight = total_df[total_df['title'] == find_title].weight.iloc[0]
+        find_weight = total_df[total_df['title'] == query_title].weight.iloc[0]
         if str(find_weight) == 'nan':
             weight_check = False
 
     if weight_check:
-        sim_weight_array = total_df.weight[title_sim_idx]
-        title_sim_idx = weight_filter(find_weight, sim_weight_array, title_sim_idx)
+        sim_arr_weight = total_df.weight[title_sim_idx]
+        title_sim_idx = weight_filter(find_weight, sim_arr_weight, title_sim_idx)
 
-    get = title_array[title_sim_idx]
+    get = arr_title[title_sim_idx]
     tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
     acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
 
     return acc, prec
 
-def img_evaluate_model(find_title, total_df, title_array, img_index, img_vector, img_threshold = 0.1, weight_check=True):
-    origin = find_answer(find_title, total_df)
+def img_evaluate_model(query_title, total_df, arr_title, img_index, img_vector, img_threshold = 0.1, weight_check=True):
+    origin = find_answer(query_title, total_df)
     # 예측 array
-    img_sim_idx, img_sim_titles, img_scores = search_range_index(find_title, title_array, img_index, img_vector, img_threshold)
+    img_sim_idx, img_sim_titles, img_scores = search_range_index(query_title, arr_title, img_index, img_vector, img_threshold)
 
 
     ## 2 필터링 (중량)
     if weight_check:
-        find_weight = total_df[total_df['title'] == find_title].weight.iloc[0]
+        find_weight = total_df[total_df['title'] == query_title].weight.iloc[0]
         if str(find_weight) == 'nan':
             weight_check = False
 
     if weight_check:
-        sim_weight_array = total_df.weight[img_sim_idx]
-        img_sim_idx = weight_filter(find_weight, sim_weight_array, img_sim_idx)
+        sim_arr_weight = total_df.weight[img_sim_idx]
+        img_sim_idx = weight_filter(find_weight, sim_arr_weight, img_sim_idx)
 
 
-    get = title_array[img_sim_idx]
+    get = arr_title[img_sim_idx]
 
     tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
     acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
@@ -126,44 +126,44 @@ def img_evaluate_model(find_title, total_df, title_array, img_index, img_vector,
     return acc, prec
 
 # img -> title -> weight
-def multi_filter_evaluate_model_1(find_title, total_df, title_array, img_index, img_vector, title_vector, img_thrshold=0.1, cos_threshold=0.8, weight_check=True):
-    origin = find_answer(find_title, total_df)
-    find_index = total_df[total_df['title'] == find_title].index[0]
+def multi_filter_evaluate_model_1(query_title, total_df, arr_title, img_index, img_vector, query_vector, img_thrshold=0.1, cos_threshold=0.8, weight_check=True):
+    origin = find_answer(query_title, total_df)
+    find_index = total_df[total_df['title'] == query_title].index[0]
 
-    sim_index_array, sim_titles, scores = search_range_index(find_title, title_array, img_index,\
+    arr_sim_index, sim_titles, scores = search_range_index(query_title, arr_title, img_index,\
                                                              img_vector, img_thrshold)
     ## 2차 필터링용
-    find_vector = title_vector[find_index]
-    sim_title_vector = title_vector[sim_index_array]
+    find_vector = query_vector[find_index]
+    sim_query_vector = query_vector[arr_sim_index]
 
-    similarity_array = cal_cosine_similarity(find_vector, sim_title_vector)
+    similarity_array = cal_cosine_similarity(find_vector, sim_query_vector)
     sim_title_idx = np.where(similarity_array > cos_threshold)[0]
     ## 2차 필터링용
 
     ## 3차 필터링 (중량)
     if weight_check:
-        find_weight = total_df[total_df['title'] == find_title].weight.iloc[0]
+        find_weight = total_df[total_df['title'] == query_title].weight.iloc[0]
         if str(find_weight) == 'nan':
             weight_check = False
     ## 3차 필터링 (중량)
 
     if len(sim_title_idx) == 0:
         if weight_check:
-            sim_weight_array = total_df.weight[sim_index_array]
-            sim_index_array = weight_filter(find_weight, sim_weight_array, sim_index_array)
+            sim_arr_weight = total_df.weight[arr_sim_index]
+            arr_sim_index = weight_filter(find_weight, sim_arr_weight, arr_sim_index)
 
-        get = title_array[sim_index_array]
+        get = arr_title[arr_sim_index]
         tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
         acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
         return acc, prec
 
-    find_sim_title_idx = sim_index_array[sim_title_idx]
+    find_sim_title_idx = arr_sim_index[sim_title_idx]
 
     if weight_check:
-        sim_weight_array = total_df.weight[find_sim_title_idx]
-        find_sim_title_idx = weight_filter(find_weight, sim_weight_array, find_sim_title_idx)
+        sim_arr_weight = total_df.weight[find_sim_title_idx]
+        find_sim_title_idx = weight_filter(find_weight, sim_arr_weight, find_sim_title_idx)
 
-    get = title_array[find_sim_title_idx]
+    get = arr_title[find_sim_title_idx]
 
     tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
     acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
@@ -171,15 +171,15 @@ def multi_filter_evaluate_model_1(find_title, total_df, title_array, img_index, 
     return acc, prec
 
 # title -> image -> weight
-def multi_filter_evaluate_model_2(find_title, total_df, title_array, title_index, img_vector, title_vector, title_threshold=0.1, cos_threshold=0.8, weight_check=True):
-    origin = find_answer(find_title, total_df)
-    find_index = total_df[total_df['title'] == find_title].index[0]
+def multi_filter_evaluate_model_2(query_title, total_df, arr_title, title_index, img_vector, query_vector, title_threshold=0.1, cos_threshold=0.8, weight_check=True):
+    origin = find_answer(query_title, total_df)
+    find_index = total_df[total_df['title'] == query_title].index[0]
 
-    sim_index_array, sim_titles, scores = search_range_index(find_title, title_array, title_index,\
-                                                             title_vector, title_threshold)
+    arr_sim_index, sim_titles, scores = search_range_index(query_title, arr_title, title_index,\
+                                                             query_vector, title_threshold)
     ## 2차 필터링용
     find_vector = img_vector[find_index]
-    sim_img_vector = img_vector[sim_index_array]
+    sim_img_vector = img_vector[arr_sim_index]
 
     similarity_array = cal_cosine_similarity(find_vector, sim_img_vector)
     sim_img_idx = np.where(similarity_array > cos_threshold)[0]
@@ -187,29 +187,29 @@ def multi_filter_evaluate_model_2(find_title, total_df, title_array, title_index
 
     ## 3차 필터링 (중량)
     if weight_check:
-        find_weight = total_df[total_df['title'] == find_title].weight.iloc[0]
+        find_weight = total_df[total_df['title'] == query_title].weight.iloc[0]
         if str(find_weight) == 'nan':
             weight_check = False
     ## 3차 필터링 (중량)
 
     if len(sim_img_idx) == 0:
         if weight_check:
-            sim_weight_array = total_df.weight[sim_index_array]
-            sim_index_array = weight_filter(find_weight,sim_weight_array,sim_index_array)
+            sim_arr_weight = total_df.weight[arr_sim_index]
+            arr_sim_index = weight_filter(find_weight,sim_arr_weight,arr_sim_index)
 
-        get = title_array[sim_index_array]
+        get = arr_title[arr_sim_index]
         tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
         acc, prec = evaluate_performance(get, origin, tmp_origin, tmp_get)
         return acc, prec
 
-    find_sim_title_idx = sim_index_array[sim_img_idx]
+    find_sim_title_idx = arr_sim_index[sim_img_idx]
 
 
     if weight_check:
-        sim_weight_array = total_df.weight[find_sim_title_idx]
-        find_sim_title_idx = weight_filter(find_weight,sim_weight_array,find_sim_title_idx)
+        sim_arr_weight = total_df.weight[find_sim_title_idx]
+        find_sim_title_idx = weight_filter(find_weight,sim_arr_weight,find_sim_title_idx)
 
-    get = title_array[find_sim_title_idx]
+    get = arr_title[find_sim_title_idx]
 
 
     tmp_origin, tmp_get = evaluate_preprocessing(origin, get)
@@ -218,7 +218,7 @@ def multi_filter_evaluate_model_2(find_title, total_df, title_array, title_index
     return acc, prec
 
 
-# evaluate_model('푸드) 컨츄리타임 레몬향(레몬에이드) 585g', total_df, title_array, cleaned_title_array, index1, minmax_word_df1, 0.2)
+# evaluate_model('푸드) 컨츄리타임 레몬향(레몬에이드) 585g', total_df, arr_title, cleaned_arr_title, index1, minmax_word_df1, 0.2)
 
 ##################################################################################################################################################################################################################################################
 ############################################################### TFIDF top_n models ###############################################################################################################################################################

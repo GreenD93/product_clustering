@@ -6,13 +6,13 @@ import numpy as np
 
 class FilterHandler:
 
-    def __init__(self, title_array, weight_array, title_index=None, title_vector=None, img_index=None, img_vector=None, concat_index=None, concat_vector=None):
+    def __init__(self, arr_title, arr_weight, title_index=None, query_vector=None, img_index=None, img_vector=None, concat_index=None, concat_vector=None):
         
-        self.title_array = title_array
-        self.weight_array = weight_array
+        self.arr_title = arr_title
+        self.arr_weight = arr_weight
 
         self.title_index = title_index
-        self.title_vector = np.ascontiguousarray(title_vector, dtype=np.float32)
+        self.query_vector = np.ascontiguousarray(query_vector, dtype=np.float32)
         
         self.img_index = img_index
         self.img_vector = np.ascontiguousarray(img_vector, dtype=np.float32)
@@ -23,12 +23,12 @@ class FilterHandler:
     def get_filter(self, filter_type):
 
         if filter_type == 'intersection':
-            clustering_filter = IntersectionFilter(self.title_array, self.weight_array, self.title_index, self.title_vector, self.img_index, self.img_vector)
+            clustering_filter = IntersectionFilter(self.arr_title, self.arr_weight, self.title_index, self.query_vector, self.img_index, self.img_vector)
 
         elif filter_type == 'concat':
-            clustering_filter = ConcatFilter(self.title_array, self.weight_array, self.concat_index, self.concat_vector)
+            clustering_filter = ConcatFilter(self.arr_title, self.arr_weight, self.concat_index, self.concat_vector)
 
         else:
-            clustering_filter = SequentialFilter(self.title_array, self.weight_array, self.title_index, self.title_vector, self.img_index, self.img_vector)
+            clustering_filter = SequentialFilter(self.arr_title, self.arr_weight, self.title_index, self.query_vector, self.img_index, self.img_vector)
 
         return clustering_filter

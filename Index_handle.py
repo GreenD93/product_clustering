@@ -4,7 +4,7 @@ import faiss
 SIMPLE_IVF_COUNT = 4
 SIMPLE_METHOD = 'IVF{},Flat'.format(SIMPLE_IVF_COUNT)
 
-class FaissHandler():
+class IndexHandler():
     def __init__(self):
         self.index = None
                 
