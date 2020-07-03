@@ -14,7 +14,7 @@ class ConcatFilter(Filter):
     def do(self, query_title, threshold=0.1, weight_check=True):
 
         # 예측 array, idx, title, distance
-        sim_arr_idx, sim_titles, _ = self._search_range_index(query_title, self.arr_title, \
+        sim_arr_idx, sim_titles, _ = self._search_range_idx(query_title, self.arr_title, \
                                                                   self.concat_index, self.arr_concat_vector, threshold)
 
         find_idx = np.where(self.arr_title == query_title)[0].item(0)
