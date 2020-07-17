@@ -32,62 +32,8 @@ class WVSGenerator():
         
     def save_total_wvs(self, save_path):
         np.savez(save_path, self.total_wvs)
-        
-    def do(self, n_worker):
-        
-        if n_worker > 1:
-            
-            # split arr with n chunks
-            arr_process_num = [i for i in range(0, n_worker)]
-            arr_chunks = np.array_split(self.arr_title, n_worker)
-            arr_cleaned_chunks = np.array_split(self.cleaned_arr_title, n_worker)
-            
-
-            # multi-processing
-            print('{0} process running...'.format(n_worker))
-            pool = multiprocessing.Pool(processes = n_worker)
-            results = pool.starmap(self._wvs_process, zip(arr_chunks, arr_cleaned_chunks, arr_process_num))
-            pool.close()
-            pool.join()
-
-            total_arr_wvs = np.vstack(results)
-        
-        else:
-            total_arr_wvs = self._wvs_process(self.arr_title, self.cleaned_arr_title)
-            
-        self.total_wvs = np.ascontiguousarray(total_arr_wvs).astype('float32')
-        
-        return total_arr_wvs
-
-    # make feature vector
-    def make_wvs_vector(self, query_title, arr_title=[], cleaned_arr_title=[]):
-        
-        if arr_title == []:
-            arr_title = self.arr_title
-            cleaned_arr_title = self.cleaned_arr_title
-        
-        word_array, value_array = self._find_word_weight(query_title, arr_title, cleaned_arr_title)
-        
-        weighted_word_dict = dict(zip(word_array, value_array))
-        weighted_word_dict = sorted(weighted_word_dict.items())
-        
-        wvs_vector = np.zeros(shape=self.vector_size)
-        
-        for word, value in weighted_word_dict:
-            w2v_value = self.w2v_model.wv[word]
-            weighted_value = w2v_value * value
-            wvs_vector += weighted_value
-        
-        denominator = len(weighted_word_dict)
-        if not len(weighted_word_dict):
-            denominator = 1e-13
-
-        wvs_vector = wvs_vector / denominator
-        normalized_wvs_vector = self._normalize(wvs_vector)
-        
-        return normalized_wvs_vector
     
-    def _wvs_process(self, arr_title, cleaned_arr_title, process_num=0):
+    def _wvs_process(self, arr_title, process_num=0):
         
         num = 0
         total_count = len(arr_title)
@@ -95,17 +41,17 @@ class WVSGenerator():
         arr_wvs = np.zeros(shape=(total_count, self.vector_size))
 
         for query_title in tqdm(arr_title):
-            wvs = self.make_wvs_vector(query_title, arr_title, cleaned_arr_title)
+            wvs = self.make_wvs_vector(query_title)
             arr_wvs[num] = wvs
             num += 1
 
         return arr_wvs
 
-    def _find_word_weight(self, query_title, arr_title, cleaned_arr_title):
+    def _find_word_weight(self, query_title):
 
         # find title inx & cleaned title
-        query_idx = np.where(arr_title == query_title)[0].item(0)
-        cleaened_query_title = cleaned_arr_title[query_idx]
+        query_idx = np.where(self.arr_title == query_title)[0].item(0)
+        cleaened_query_title = self.cleaned_arr_title[query_idx]
         
         query_sparse_matrix = self.tfidf_model.transform(np.array(cleaened_query_title))
         sparse_dict = dok_matrix(query_sparse_matrix)
@@ -129,14 +75,69 @@ class WVSGenerator():
         
         return normalized_vector
     
+    def _get_word_vector(self, word):
+        return self.w2v_model.wv[word]
+    
+    # make feature vector
+    def make_wvs_vector(self, query_title, avg=True):
+                
+        word_array, value_array = self._find_word_weight(query_title)
+        
+        weighted_word_dict = dict(zip(word_array, value_array))
+        weighted_word_dict = sorted(weighted_word_dict.items())
+        
+        wvs_vector = np.zeros(shape=self.vector_size)
+        
+        for word, value in weighted_word_dict:
+            word_vector = self._get_word_vector(word)
+            weighted_vector = word_vector * value
+            wvs_vector += weighted_vector
+        
+        if not len(weighted_word_dict):
+            denominator = 1e-13
+            
+        if avg:
+            denominator = len(weighted_word_dict)
+
+        wvs_vector = wvs_vector / denominator
+        normalized_wvs_vector = self._normalize(wvs_vector)
+        
+        return normalized_wvs_vector
+
+    def do(self, n_worker):
+        
+        if n_worker > 1:
+            
+            # split arr with n chunks
+            arr_process_num = [i for i in range(0, n_worker)]
+            arr_chunks = np.array_split(self.arr_title, n_worker)
+            
+
+            # multi-processing
+            print('{0} process running...'.format(n_worker))
+            pool = multiprocessing.Pool(processes = n_worker)
+            results = pool.starmap(self._wvs_process, zip(arr_chunks, arr_process_num))
+            pool.close()
+            pool.join()
+
+            total_arr_wvs = np.vstack(results)
+        
+        else:
+            total_arr_wvs = self._wvs_process(self.arr_title)
+            
+        total_wvs = np.ascontiguousarray(total_arr_wvs).astype('float32')
+        self.total_wvs = total_wvs
+        
+        return total_wvs
+    
 if __name__ == '__main__':
     
-    arr_title = pd.read_csv('example/new_feat_df.csv', usecols=['title']).values
-    cleaned_arr_title = pd.read_csv('example/new_feat_df.csv', usecols=['cleaned_title']).fillna('').values
+    arr_title = pd.read_csv('res/data/new_feat_df.csv', usecols=['title']).values
+    cleaned_arr_title = pd.read_csv('res/data/new_feat_df.csv', usecols=['cleaned_title']).fillna('').values
     
     # Word2vec & TFIDF model path
-    WVS_PATH = 'Model/가공식품_word2vec.model'
-    TFIDF_PATH = 'Model/가공식품_tfidf_model.pkl'
+    WVS_PATH = 'res/model/가공식품_word2vec.model'
+    TFIDF_PATH = 'res/model/가공식품_tfidf_model.pkl'
     
     w2v_model = Word2Vec.load(WVS_PATH)
     tfidf_model = pickle.load(open(TFIDF_PATH, 'rb'))
