@@ -18,11 +18,8 @@ class SIFGenerator():
         self.sif_parm = sif_parm
         self.vector_size = vector_size
         
-        
         self.word_freq_dict = None
         self.total_word_freq = None
-        
-        self.arr_title = None
         self.w2v_model = None
         self.total_sif_arr_wvs = None
 
