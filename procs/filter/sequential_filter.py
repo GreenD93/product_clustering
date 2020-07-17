@@ -62,5 +62,6 @@ class SequentialFilter(Filter):
                 find_sim_title_idx = self._filter_weight(find_weight, sim_arr_weight, find_sim_title_idx)
 
             arr_sim_title = self.arr_title[find_sim_title_idx]
+            arr_sim_title = arr_sim_title.flatten()
 
         return arr_sim_title

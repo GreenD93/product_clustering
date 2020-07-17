@@ -29,6 +29,7 @@ class ConcatFilter(Filter):
             sim_arr_weight = self.arr_weight[sim_arr_idx]
             sim_arr_idx = self._filter_weight(find_weight, sim_arr_weight, sim_arr_idx)
 
-        arr_predict_title = self.arr_title[sim_arr_idx]
+        arr_sim_title = self.arr_title[sim_arr_idx]
+        arr_sim_title = arr_sim_title.flatten()
 
-        return arr_predict_title
+        return arr_sim_title
