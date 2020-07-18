@@ -69,7 +69,7 @@ class WVSGenerator():
         self.tfidf_model = vectorizer
     
     def _get_tfidf_feature_names(self):
-        self.tfidf_feature_names = np.array(self.tfidf_model.get_feature_names())
+        return np.array(self.tfidf_model.get_feature_names())
     
     def _find_word_weight(self, query_title):
         query_sparse_matrix = self._get_query_sparse_matrix(query_title)
@@ -155,7 +155,7 @@ class WVSGenerator():
             self._make_tfidf_model(arr_title)
         
         # get tfidf feature names()
-        self._get_tfidf_feature_names()
+        self.tfidf_feature_names = self._get_tfidf_feature_names()
         
         if n_worker > 1:
             
