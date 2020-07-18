@@ -11,18 +11,18 @@ from tqdm import tqdm
 #https://bab2min.tistory.com/631
 class SIFGenerator():
     
-    def __init__(self, w2v_model=None, sif_parm=0.001, vector_size=100):
+    def __init__(self, w2v_model=None, word_freq_dict=None, sif_parm=0.001, vector_size=100):
         
         self.scaler = MinMaxScaler()
         
         self.sif_parm = sif_parm
         self.vector_size = vector_size
         
-        self.word_freq_dict = None
-        self.total_word_freq = None    
         self.total_sif_wvs = None
         
         self.w2v_model = w2v_model
+        self.word_freq_dict = word_freq_dict
+        self.total_word_freq = None
 
     def get_total_wvs(self):
         return self.total_sif_wvs
@@ -52,12 +52,12 @@ class SIFGenerator():
     def _make_word_freq_dict(self, arr_title):
         
         arr_token_list = list(map(lambda x : x.split(' '), arr_title))
-        word_freq_dict = Counter([ token for token_list in arr_token_list for token in token_list])
+        word_freq_dict = Counter([ token for token_list in arr_token_list for token in token_list ])
         
         self.word_freq_dict = dict(word_freq_dict)
     
     def _get_total_word_freq(self):
-        self.total_word_freq = sum(self.word_freq_dict.values())
+        return sum(self.word_freq_dict.values())
     
     def _get_word_weight(self, word):
         
@@ -136,10 +136,11 @@ class SIFGenerator():
             self._make_w2v_model(arr_title, n_worker=n_worker)
         
         # make word freq dict
-        self._make_word_freq_dict(arr_title)
+        if self.word_freq_dict is None:
+            self._make_word_freq_dict(arr_title)
         
         # get total word freq
-        self._get_total_word_freq()
+        self.total_word_freq = self._get_total_word_freq()
         
         if n_worker > 1:
             
@@ -174,7 +175,7 @@ if __name__ == '__main__':
     str_token_list = ['아버지 가방에 들어가신다', '이 문장은 예시 입니다.']
     
     sif_generator = SIFGenerator()
-    total_sif_wvs = sif_generator.do(str_token_list, n_worker = 3, svd=True)
+    total_sif_wvs = sif_generator.do(str_token_list, n_worker=3, svd=True)
     
     # make title vector
     test_title = '아버지 가방에 들어가신다'
