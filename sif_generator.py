@@ -47,7 +47,14 @@ class SIFGenerator():
         return normalized_vector
     
     def _get_word_vector(self, word):
-        return self.w2v_model.wv[word]
+        
+        try:
+            word_vector = self.w2v_model.wv[word]
+            
+        except KeyError:
+            word_vector = np.zeros(self.vector_size)
+            
+        return word_vector
         
     def _make_word_freq_dict(self, arr_title):
         
