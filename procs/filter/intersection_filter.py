@@ -3,12 +3,12 @@ import numpy as np
 
 class IntersectionFilter(Filter):
 
-    def __init__(self, arr_title, arr_weight, title_index, arr_query_vector, img_index, arr_img_vector):
+    def __init__(self, arr_title, arr_weight, title_index, arr_title_vector, img_index, arr_img_vector):
         self.arr_title = arr_title
         self.arr_weight = arr_weight
         
         self.title_index = title_index
-        self.arr_query_vector = arr_query_vector
+        self.arr_title_vector = arr_title_vector
         
         self.img_index = img_index
         self.arr_img_vector = arr_img_vector
@@ -39,11 +39,11 @@ class IntersectionFilter(Filter):
 
         # 1차 img, idx, title, distance
         img_sim_idx, img_sim_titles, _ = self._search_range_idx(query_title, self.arr_title,
-                                                                  self.img_index, self.img_vector, img_thrshold)
+                                                                  self.img_index, self.arr_img_vector, img_thrshold)
 
         # 2차 title, idx, title, distance
         title_sim_idx, title_sim_titles, _ = self._search_range_idx(query_title, self.arr_title,
-                                                                      self.title_index, self.arr_query_vector, title_threshold)
+                                                                      self.title_index, self.arr_title_vector, title_threshold)
 
         arr_sim_idx = np.intersect1d(img_sim_idx, title_sim_idx)
 

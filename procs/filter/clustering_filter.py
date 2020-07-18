@@ -12,14 +12,14 @@ class Filter():
         
         return sim_array
 
-    def _find_idx_vector(self, query, arr_query, arr_query_vector):
+    def _find_idx_vector(self, query, arr_query, arr_title_vector):
         # find index
         idx = np.isin(arr_query, query)
         query_idx = np.where(idx)[0][0]
 
         # query vector (cleaned_title이 vector가 된 곳에서 query index로 찾기)
         # 실제 서비스에서 db로 대체 가능
-        query_vector = arr_query_vector[query_idx]
+        query_vector = arr_title_vector[query_idx]
 
         return query_idx, query_vector
 
@@ -40,12 +40,12 @@ class Filter():
 
         return arr_sim_idx, sim_titles, scores
 
-    def _search_range_idx(self, query, arr_query, index, arr_query_vector, threshold):
+    def _search_range_idx(self, query, arr_query, index, arr_title_vector, threshold):
 
-        vector_dim = arr_query_vector[0].shape[0]
+        vector_dim = arr_title_vector[0].shape[0]
 
         # title index, vector
-        query_idx, query_vector = self._find_idx_vector(query, arr_query, arr_query_vector)
+        query_idx, query_vector = self._find_idx_vector(query, arr_query, arr_title_vector)
 
         query_vector = query_vector.reshape(-1, vector_dim)
         arr_sim_idx, sim_titles, scores = self._find_range_sim_query(query_vector, index, arr_query, threshold)

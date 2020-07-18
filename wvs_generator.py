@@ -1,37 +1,106 @@
-import pandas as pd
-import numpy as np
-import pickle
-import operator
 import multiprocessing
-from tqdm import tqdm
+from collections import Counter
 
 from gensim.models import Word2Vec
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
 from scipy.sparse import dok_matrix
 
+import pickle
+import numpy as np
 
+from tqdm import tqdm
 
 class WVSGenerator():
     
-    def __init__(self, arr_title, cleaned_arr_title, w2v_model, tfidf_model):
+    def __init__(self, w2v_model=None, tfidf_model=None, vector_size=100):
         
-        self.arr_title = arr_title
-        self.cleaned_arr_title = cleaned_arr_title
         self.scaler = MinMaxScaler()
         
-        self.w2v_model = w2v_model
-        self.tfidf_model = tfidf_model
-        self.tfidf_feature_names = np.array(self.tfidf_model.get_feature_names())
+        self.vector_size = vector_size
         
-        self.vector_size = self.w2v_model.vector_size
-        
+        self.tfidf_feature_names = None
         self.total_wvs = None
-
+        
+        self.w2v_model = None
+        self.tfidf_model = None
+        
     def get_total_wvs(self):
         return self.total_wvs
         
     def save_total_wvs(self, save_path):
+        print('=> save total_wvs to {0}'.format(save_path))
         np.savez(save_path, self.total_wvs)
+
+    def get_w2v_model(self):
+        return self.w2v_model
+    
+    def save_w2v_model(self, save_path):
+        print('=> save w2v_model to {0}'.format(save_path))
+        self.w2v_model.save(save_path)
+        
+    def get_tfidf_model(self):
+        return self.tfidf_model
+    
+    def save_tfidf_model(self, save_path):
+        print('=> save tfidf_model to {0}'.format(save_path))
+        pickle.dump(self.tfidf_model, open(save_path, "wb"))
+        
+    def _normalize(self, vector):
+
+        vector = vector.reshape(-1, 1)
+        normalized_vector = self.scaler.fit_transform(vector)
+        normalized_vector = normalized_vector.reshape(1, -1)
+        
+        return normalized_vector
+        
+    def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
+        print('=> start training w2v model....')
+        splited_token_list = [str_token.split(' ') for str_token in arr_title]
+        w2v_model = Word2Vec(splited_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
+        print('=> end training w2v model....')
+        self.w2v_model = w2v_model
+        
+    def _make_tfidf_model(self, arr_title):
+        print('=> start training tfidf model....')
+        vectorizer = TfidfVectorizer(encoding=u'utf-8', token_pattern='[가-힣a-zA-Z0-9]+', lowercase=False, min_df=1)
+        vectorizer.fit_transform(arr_title)
+        print('=> end training tfidf model....')
+        self.tfidf_model = vectorizer
+    
+    def _get_tfidf_feature_names(self):
+        self.tfidf_feature_names = np.array(self.tfidf_model.get_feature_names())
+    
+    def _find_word_weight(self, query_title):
+        query_sparse_matrix = self._get_query_sparse_matrix(query_title)
+        sparse_dict = self._make_sparse_dict(query_sparse_matrix)
+
+        if len(sparse_dict) == 0:
+            words, weights = np.array([]), np.array([])
+            return words, weights
+
+        # key & value
+        keys = np.array([i[1] for i in sparse_dict.keys()])
+        words = self.tfidf_feature_names[keys]
+        weights = np.array(list(sparse_dict.values()))
+
+        return words, weights
+
+    def _get_word_vector(self, word):
+        
+        try:
+            word_vector = self.w2v_model.wv[word]
+            
+        except KeyError:
+            word_vector = np.zeros(self.vector_size)
+            
+        return word_vector
+    
+    def _get_query_sparse_matrix(self, query_title):
+        return self.tfidf_model.transform(np.array([query_title]))
+    
+    def _make_sparse_dict(self, sparse_matrix):
+        return dok_matrix(sparse_matrix)
     
     def _wvs_process(self, arr_title, process_num=0):
         
@@ -46,73 +115,54 @@ class WVSGenerator():
             num += 1
 
         return arr_wvs
-
-    def _find_word_weight(self, query_title):
-
-        # find title inx & cleaned title
-        query_idx = np.where(self.arr_title == query_title)[0].item(0)
-        cleaened_query_title = self.cleaned_arr_title[query_idx]
-        
-        query_sparse_matrix = self.tfidf_model.transform(np.array(cleaened_query_title))
-        sparse_dict = dok_matrix(query_sparse_matrix)
-
-        if len(sparse_dict) == 0:
-            words, values = np.array([]), np.array([])
-            return words, values
-
-        # key & value
-        keys = np.array([i[1] for i in sparse_dict.keys()])
-        words = self.tfidf_feature_names[keys]
-        values = np.array(list(sparse_dict.values()))
-
-        return words, values
-    
-    def _normalize(self, vector):
-
-        vector = vector.reshape(-1, 1)
-        normalized_vector = self.scaler.fit_transform(vector)
-        normalized_vector = normalized_vector.reshape(1, -1)
-        
-        return normalized_vector
-    
-    def _get_word_vector(self, word):
-        return self.w2v_model.wv[word]
     
     # make feature vector
-    def make_wvs_vector(self, query_title, avg=True):
+    def make_wvs_vector(self, query_title, avg=True, normalize=True):
                 
-        word_array, value_array = self._find_word_weight(query_title)
+        word_array, weight_array = self._find_word_weight(query_title)
         
-        weighted_word_dict = dict(zip(word_array, value_array))
+        weighted_word_dict = dict(zip(word_array, weight_array))
         weighted_word_dict = sorted(weighted_word_dict.items())
         
         wvs_vector = np.zeros(shape=self.vector_size)
         
-        for word, value in weighted_word_dict:
+        for word, weight in weighted_word_dict:
             word_vector = self._get_word_vector(word)
-            weighted_vector = word_vector * value
+            weighted_vector = weight * word_vector
             wvs_vector += weighted_vector
         
-        if not len(weighted_word_dict):
+        if len(weighted_word_dict):
+            denominator = len(weighted_word_dict)
+        else:
             denominator = 1e-13
             
         if avg:
-            denominator = len(weighted_word_dict)
-
-        wvs_vector = wvs_vector / denominator
-        normalized_wvs_vector = self._normalize(wvs_vector)
+            wvs_vector = wvs_vector / denominator
         
-        return normalized_wvs_vector
+        if normalize:
+            wvs_vector = self._normalize(wvs_vector)
+        
+        return wvs_vector
+    
+    def do(self, arr_title, n_worker):
 
-    def do(self, n_worker):
+        # make w2v model
+        if self.w2v_model is None:
+            self._make_w2v_model(arr_title, n_worker=n_worker)
+        
+        # make tfidf model
+        if self.tfidf_model is None:
+            self._make_tfidf_model(arr_title)
+        
+        # get tfidf feature names()
+        self._get_tfidf_feature_names()
         
         if n_worker > 1:
             
             # split arr with n chunks
             arr_process_num = [i for i in range(0, n_worker)]
-            arr_chunks = np.array_split(self.arr_title, n_worker)
+            arr_chunks = np.array_split(arr_title, n_worker)
             
-
             # multi-processing
             print('{0} process running...'.format(n_worker))
             pool = multiprocessing.Pool(processes = n_worker)
@@ -120,68 +170,46 @@ class WVSGenerator():
             pool.close()
             pool.join()
 
-            total_arr_wvs = np.vstack(results)
+            total_wvs = np.vstack(results)
         
         else:
-            total_arr_wvs = self._wvs_process(self.arr_title)
+            total_wvs = self._wvs_process(arr_title)
             
-        total_wvs = np.ascontiguousarray(total_arr_wvs).astype('float32')
         self.total_wvs = total_wvs
+        
+        print('=> make_wvs process is done....')
         
         return total_wvs
     
 if __name__ == '__main__':
     
-    arr_title = pd.read_csv('res/data/new_feat_df.csv', usecols=['title']).values
-    cleaned_arr_title = pd.read_csv('res/data/new_feat_df.csv', usecols=['cleaned_title']).fillna('').values
+    # test training wvs generator
+    str_token_list = ['아버지 가방에 들어가신다', '이 문장은 예시 입니다.']
     
-    # Word2vec & TFIDF model path
-    WVS_PATH = 'res/model/가공식품_word2vec.model'
-    TFIDF_PATH = 'res/model/가공식품_tfidf_model.pkl'
+    wvs_generator = WVSGenerator()
+    total_wvs = wvs_generator.do(str_token_list, n_worker=3)
     
-    w2v_model = Word2Vec.load(WVS_PATH)
-    tfidf_model = pickle.load(open(TFIDF_PATH, 'rb'))
-    
-    vector_generator = WVSGenerator(arr_title, cleaned_arr_title, w2v_model, tfidf_model)
-    
-    query_title = '산고추 고추절임 업소용식자재 (500gX10개) 한푸드'
-    
-    query_vector = vector_generator.make_wvs_vector(query_title)
-    
-    print(query_vector)
+    # make title vector
+    test_title = '아버지 가방에 들어가신다'
+    title_vector = wvs_generator.make_wvs_vector(test_title)
+
+    print(title_vector)
     
 # output (vector_size):
-# [[0.7993041  0.45954755 0.43287463 0.58399381 0.62696965 0.41444568
-#   0.42715278 0.21784938 0.42107257 0.39600341 0.6753512  0.43215121
-#   0.28987078 0.30139453 0.77971103 0.51240434 0.34315612 0.37671802
-#   0.70597699 0.51440302 0.18105755 0.47145197 0.69664769 0.53683441
-#   0.55223246 0.76233321 0.79113157 0.81572251 0.35385517 0.22793472
-#   0.40146304 0.83502754 0.38259046 0.65550829 0.48707275 0.58369225
-#   0.8558958  0.86365299 0.         0.54324413 0.2838306  0.27718614
-#   0.91887353 0.213611   0.47868564 0.2926584  0.49688589 0.62966477
-#   0.32772961 0.28971896 0.45733867 0.81319629 0.35194272 0.49208292
-#   0.33863438 0.5860372  0.78709779 0.32629157 0.83702437 0.43670857
-#   0.51970286 0.58142041 0.7283164  0.44165328 0.69414472 0.38550232
-#   0.36747124 0.62724117 0.78538031 0.62944537 0.63595775 0.53387729
-#   0.51067102 0.20312996 0.3784164  0.61668457 0.57342853 0.77173496
-#   0.44978332 0.75412803 0.29874427 0.62084654 0.59570668 0.72516136
-#   0.38966769 0.59565013 0.54689843 0.25979465 0.69620666 0.97684997
-#   0.42726998 0.78741461 0.3665031  0.1980029  0.52462379 0.34604349
-#   0.56335754 0.40334404 0.74219414 0.73507773 0.55447879 0.57526841
-#   0.7830574  0.73007993 0.38000325 0.64353878 0.61818209 0.73507546
-#   0.55633269 0.27911975 0.75582588 0.47228369 0.57053293 0.29146557
-#   0.24709219 0.55689494 0.4397716  0.31814666 0.0784147  0.54194603
-#   0.59058249 0.30320304 0.55516541 0.59461697 0.50318493 0.25268175
-#   0.63755497 0.51927957 0.66201459 0.74739778 0.32071416 0.84807033
-#   0.10462778 0.63066664 0.27378149 0.52960732 0.63209641 0.38921925
-#   0.44095743 0.46289351 0.96286715 0.61159595 0.38923528 0.7298151
-#   0.81325945 0.51796488 0.59248876 0.62451137 0.6509626  0.64513702
-#   0.39773623 0.71520807 0.43713605 0.3789452  0.53417452 0.50131186
-#   0.41800101 0.83702052 0.4764972  0.77813945 0.54409759 0.78756508
-#   0.24054322 0.75215056 0.22881333 0.46260653 0.66104794 0.35638452
-#   0.6797639  0.26633944 0.48571695 0.45446518 0.34336551 0.60379169
-#   0.89973002 0.52658932 0.32903472 0.36746675 0.39542926 0.66817701
-#   0.50686835 0.63019941 0.49982627 0.60891389 0.58907521 0.40274162
-#   0.70191907 0.66471756 0.48172845 1.         0.66104881 0.1861169
-#   0.36615752 0.46711602 0.40663426 0.2299847  0.72481804 0.53904228
-#   0.44282582 0.69629679]]:
+# [[0.61880634 0.27024904 0.44064757 0.83468468 0.65102677 0.35300063
+#   0.37036863 0.54567909 0.57597407 0.36810817 1.         0.86062455
+#   0.67168928 0.42570229 0.5331886  0.72507176 0.30209711 0.71503442
+#   0.60365092 0.35338949 0.31571771 0.49931365 0.20970246 0.28141216
+#   0.6110637  0.68429382 0.25311739 0.62917164 0.29522942 0.23894072
+#   0.50450487 0.41283829 0.28094866 0.59555713 0.95990337 0.46211074
+#   0.68893765 0.71982497 0.35049874 0.64356724 0.56462712 0.17448475
+#   0.63351981 0.20482745 0.21019455 0.47121575 0.99900673 0.38729769
+#   0.63209597 0.52264756 0.84319659 0.41244818 0.8066209  0.13496225
+#   0.61388895 0.43092339 0.22324945 0.52286587 0.43005578 0.78749165
+#   0.53311584 0.25554156 0.13834877 0.7977924  0.69759237 0.59366645
+#   0.37241615 0.3126012  0.99450398 0.15049812 0.51263346 0.41689056
+#   0.82039361 0.88730487 0.52170603 0.26739176 0.62206429 0.75206031
+#   0.52906226 0.32147562 0.61910118 0.60525264 0.06223111 0.707124
+#   0.83785665 0.67957613 0.17868843 0.34992439 0.75228178 0.64574129
+#   0.         0.33884197 0.4195472  0.26002865 0.42838927 0.53568893
+#   0.65819303 0.50582355 0.37990875 0.62522273]]
