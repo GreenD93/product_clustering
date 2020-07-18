@@ -22,8 +22,8 @@ class WVSGenerator():
         self.tfidf_feature_names = None
         self.total_wvs = None
         
-        self.w2v_model = None
-        self.tfidf_model = None
+        self.w2v_model = w2v_model
+        self.tfidf_model = tfidf_model
         
     def get_total_wvs(self):
         return self.total_wvs
