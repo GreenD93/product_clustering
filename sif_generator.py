@@ -12,12 +12,14 @@ from tqdm import tqdm
 #https://bab2min.tistory.com/631
 class SIFGenerator():
     
-    def __init__(self, w2v_model=None, word_freq_dict=None, sif_parm=0.001, vector_size=100):
+    def __init__(self, w2v_model=None, word_freq_dict=None, sif_parm=0.001, vector_size=100, avg=True, norm=True):
         
         self.scaler = MinMaxScaler()
         
         self.sif_parm = sif_parm
         self.vector_size = vector_size
+        self.avg = avg
+        self.norm = norm
         
         self.total_sif_wvs = None
         
@@ -119,7 +121,7 @@ class SIFGenerator():
         self.w2v_model = w2v_model
         
     # make feature vector
-    def make_sif_wvs_vector(self, query_title, avg=True, normalize=True):
+    def make_sif_wvs_vector(self, query_title):
         
         arr_token = query_title.split(' ')
         sif_wvs_vector = np.zeros(shape=self.vector_size)
@@ -136,10 +138,10 @@ class SIFGenerator():
         else:
             denominator = 1e-13
             
-        if avg:
+        if self.avg:
             sif_wvs_vector = sif_wvs_vector / denominator
         
-        if normalize:
+        if self.norm:
             sif_wvs_vector = self._normalize(sif_wvs_vector)
         
         return sif_wvs_vector

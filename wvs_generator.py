@@ -13,11 +13,13 @@ from tqdm import tqdm
 
 class WVSGenerator():
     
-    def __init__(self, w2v_model=None, tfidf_model=None, vector_size=100):
+    def __init__(self, w2v_model=None, tfidf_model=None, vector_size=100, avg=True, norm=True):
         
         self.scaler = MinMaxScaler()
         
         self.vector_size = vector_size
+        self.avg = avg
+        self.norm = norm
         
         self.tfidf_feature_names = None
         self.total_wvs = None
@@ -117,7 +119,7 @@ class WVSGenerator():
         return arr_wvs
     
     # make feature vector
-    def make_wvs_vector(self, query_title, avg=True, normalize=True):
+    def make_wvs_vector(self, query_title):
                 
         word_array, weight_array = self._find_word_weight(query_title)
         
@@ -136,10 +138,10 @@ class WVSGenerator():
         else:
             denominator = 1e-13
             
-        if avg:
+        if self.avg:
             wvs_vector = wvs_vector / denominator
         
-        if normalize:
+        if self.norm:
             wvs_vector = self._normalize(wvs_vector)
         
         return wvs_vector
