@@ -3,8 +3,9 @@ from collections import Counter
 
 from gensim.models import Word2Vec
 from sklearn.preprocessing import MinMaxScaler
-from scipy import linalg
+
 import numpy as np
+from numpy.linalg import svd
 
 from tqdm import tqdm
 
@@ -72,22 +73,29 @@ class SIFGenerator():
         word_weight = self.sif_parm / (self.sif_parm + prob_word)
         
         return word_weight
-        
-    def _get_first_singular_value_idx(self, arr_vector):
-        
-        S = linalg.svd(arr_vector, compute_uv=False)
-        fisrt_singular_value_idx = np.argmax(S)
-        
-        return fisrt_singular_value_idx
     
     def _delete_first_singular_value_col(self, total_arr_wvs):
+        
         print('=> process singular vetcor decomposition....')
-        fisrt_singular_value_idx = self._get_first_singular_value_idx(total_arr_wvs)
+        U, Sigma, Vt = svd(total_arr_wvs)
         
         print('=> delete first singular value columns....')
-        total_arr_wvs = np.delete(total_arr_wvs, [fisrt_singular_value_idx], axis=1)
+        # delete data regarding first sigular value
+        U_ = U[:, 1:]
+        Sigma_ = Sigma[1:]
+        Vt_ = Vt[1:, :]
+
+        # transform singular value matrix for inner production
+        num_rank = len(Sigma_)
+        Sigma_mat_ = np.diag(Sigma_)
+        row, col = U_.shape[1], Vt_.shape[0]
+        expand_Sigma_mat_ = np.zeros((row, col))
+        expand_Sigma_mat_[:num_rank, :num_rank] = Sigma_mat_
+
+        # restore embedding matrix
+        sif_total_arr_wvs = np.dot(np.dot(U_, expand_Sigma_mat_), Vt_)
         
-        return total_arr_wvs
+        return sif_total_arr_wvs
     
     def _process_sif_wvs(self, arr_title, process_num=0):
         
