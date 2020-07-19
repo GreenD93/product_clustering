@@ -77,7 +77,7 @@ class SIFGenerator():
     def _delete_first_singular_value_col(self, total_arr_wvs):
         
         print('=> process singular vetcor decomposition....')
-        U, Sigma, Vt = svd(total_arr_wvs)
+        U, Sigma, Vt = svd(total_arr_wvs, full_matrices=False)
         
         print('=> delete first singular value columns....')
         # delete data regarding first sigular value
