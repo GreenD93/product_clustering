@@ -12,67 +12,67 @@ import numpy as np
 from tqdm import tqdm
 
 class WVSGenerator():
-    
+
     def __init__(self, w2v_model=None, tfidf_model=None, vector_size=100, avg=True, norm=True):
-        
+
         self.scaler = MinMaxScaler()
-        
+
         self.vector_size = vector_size
         self.avg = avg
         self.norm = norm
-        
+
         self.tfidf_feature_names = None
         self.total_wvs = None
-        
+
         self.w2v_model = w2v_model
         self.tfidf_model = tfidf_model
-        
+
     def get_total_wvs(self):
         return self.total_wvs
-        
+
     def save_total_wvs(self, save_path):
         print('=> save total_wvs to {0}'.format(save_path))
         np.savez(save_path, self.total_wvs)
 
     def get_w2v_model(self):
         return self.w2v_model
-    
+
     def save_w2v_model(self, save_path):
         print('=> save w2v_model to {0}'.format(save_path))
         self.w2v_model.save(save_path)
-        
+
     def get_tfidf_model(self):
         return self.tfidf_model
-    
+
     def save_tfidf_model(self, save_path):
         print('=> save tfidf_model to {0}'.format(save_path))
         pickle.dump(self.tfidf_model, open(save_path, "wb"))
-        
+
     def _normalize(self, vector):
 
         vector = vector.reshape(-1, 1)
         normalized_vector = self.scaler.fit_transform(vector)
         normalized_vector = normalized_vector.reshape(1, -1)
-        
+
         return normalized_vector
-        
+
     def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
         print('=> start training w2v model....')
         splited_token_list = [str_token.split(' ') for str_token in arr_title]
         w2v_model = Word2Vec(splited_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
         print('=> end training w2v model....')
         self.w2v_model = w2v_model
-        
+
     def _make_tfidf_model(self, arr_title):
         print('=> start training tfidf model....')
         vectorizer = TfidfVectorizer(encoding=u'utf-8', token_pattern='[가-힣a-zA-Z0-9]+', lowercase=False, min_df=1)
         vectorizer.fit_transform(arr_title)
         print('=> end training tfidf model....')
         self.tfidf_model = vectorizer
-    
+
     def _get_tfidf_feature_names(self):
         return np.array(self.tfidf_model.get_feature_names())
-    
+
     def _find_word_weight(self, query_title):
         query_sparse_matrix = self._get_query_sparse_matrix(query_title)
         sparse_dict = self._make_sparse_dict(query_sparse_matrix)
@@ -89,26 +89,26 @@ class WVSGenerator():
         return words, weights
 
     def _get_word_vector(self, word):
-        
+
         try:
             word_vector = self.w2v_model.wv[word]
-            
+
         except KeyError:
             word_vector = np.zeros(self.vector_size)
-            
+
         return word_vector
-    
+
     def _get_query_sparse_matrix(self, query_title):
         return self.tfidf_model.transform(np.array([query_title]))
-    
+
     def _make_sparse_dict(self, sparse_matrix):
         return dok_matrix(sparse_matrix)
-    
-    def _wvs_process(self, arr_title, process_num=0):
-        
+
+    def _process_wvs(self, arr_title, process_num=0):
+
         num = 0
         total_count = len(arr_title)
-        
+
         arr_wvs = np.zeros(shape=(total_count, self.vector_size))
 
         for query_title in tqdm(arr_title):
@@ -117,86 +117,86 @@ class WVSGenerator():
             num += 1
 
         return arr_wvs
-    
+
     # make feature vector
     def make_wvs_vector(self, query_title):
-                
+
         word_array, weight_array = self._find_word_weight(query_title)
-        
+
         weighted_word_dict = dict(zip(word_array, weight_array))
         weighted_word_dict = sorted(weighted_word_dict.items())
-        
+
         wvs_vector = np.zeros(shape=self.vector_size)
-        
+
         for word, weight in weighted_word_dict:
             word_vector = self._get_word_vector(word)
             weighted_vector = weight * word_vector
             wvs_vector += weighted_vector
-        
+
         if len(weighted_word_dict):
             denominator = len(weighted_word_dict)
         else:
             denominator = 1e-13
-            
+
         if self.avg:
             wvs_vector = wvs_vector / denominator
-        
+
         if self.norm:
             wvs_vector = self._normalize(wvs_vector)
-        
+
         return wvs_vector
-    
+
     def do(self, arr_title, n_worker):
 
         # make w2v model
         if self.w2v_model is None:
             self._make_w2v_model(arr_title, n_worker=n_worker)
-        
+
         # make tfidf model
         if self.tfidf_model is None:
             self._make_tfidf_model(arr_title)
-        
+
         # get tfidf feature names()
         self.tfidf_feature_names = self._get_tfidf_feature_names()
-        
+
         if n_worker > 1:
-            
+
             # split arr with n chunks
             arr_process_num = [i for i in range(0, n_worker)]
             arr_chunks = np.array_split(arr_title, n_worker)
-            
+
             # multi-processing
             print('{0} process running...'.format(n_worker))
             pool = multiprocessing.Pool(processes = n_worker)
-            results = pool.starmap(self._wvs_process, zip(arr_chunks, arr_process_num))
+            results = pool.starmap(self._process_wvs, zip(arr_chunks, arr_process_num))
             pool.close()
             pool.join()
 
             total_wvs = np.vstack(results)
-        
+
         else:
-            total_wvs = self._wvs_process(arr_title)
-            
+            total_wvs = self._process_wvs(arr_title)
+
         self.total_wvs = total_wvs
-        
+
         print('=> make_wvs process is done....')
-        
+
         return total_wvs
-    
+
 if __name__ == '__main__':
-    
+
     # test training wvs generator
     str_token_list = ['아버지 가방에 들어가신다', '이 문장은 예시 입니다.']
-    
+
     wvs_generator = WVSGenerator()
     total_wvs = wvs_generator.do(str_token_list, n_worker=3)
-    
+
     # make title vector
     test_title = '아버지 가방에 들어가신다'
     title_vector = wvs_generator.make_wvs_vector(test_title)
 
     print(title_vector)
-    
+
 # output (vector_size):
 # [[0.61880634 0.27024904 0.44064757 0.83468468 0.65102677 0.35300063
 #   0.37036863 0.54567909 0.57597407 0.36810817 1.         0.86062455
