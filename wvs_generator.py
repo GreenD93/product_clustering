@@ -1,5 +1,5 @@
+import logging
 import multiprocessing
-from collections import Counter
 
 from gensim.models import Word2Vec
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,6 +10,20 @@ import pickle
 import numpy as np
 
 from tqdm import tqdm
+
+def init_logger():
+    logging.basicConfig(level=logging.INFO, format='[%(levelname)s]%(asctime)s| %(message)s', datefmt='%m-%d %H:%M:%S')
+    pass
+
+init_logger()
+
+def log_info(s):
+
+    s = str(s)
+    logger = logging.getLogger("filelog")
+    logger.info(s)
+
+    pass
 
 class WVSGenerator():
 
@@ -31,21 +45,21 @@ class WVSGenerator():
         return self.total_wvs
 
     def save_total_wvs(self, save_path):
-        print('=> save total_wvs to {0}'.format(save_path))
+        log_info('=> save total_wvs to {0}'.format(save_path))
         np.savez(save_path, self.total_wvs)
 
     def get_w2v_model(self):
         return self.w2v_model
 
     def save_w2v_model(self, save_path):
-        print('=> save w2v_model to {0}'.format(save_path))
+        log_info('=> save w2v_model to {0}'.format(save_path))
         self.w2v_model.save(save_path)
 
     def get_tfidf_model(self):
         return self.tfidf_model
 
     def save_tfidf_model(self, save_path):
-        print('=> save tfidf_model to {0}'.format(save_path))
+        log_info('=> save tfidf_model to {0}'.format(save_path))
         pickle.dump(self.tfidf_model, open(save_path, "wb"))
 
     def _normalize(self, vector):
@@ -57,17 +71,17 @@ class WVSGenerator():
         return normalized_vector
 
     def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
-        print('=> start training w2v model....')
-        splited_token_list = [str_token.split(' ') for str_token in arr_title]
-        w2v_model = Word2Vec(splited_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
-        print('=> end training w2v model....')
+        log_info('=> start training w2v model....')
+        splitted_token_list = [str_token.split(' ') for str_token in arr_title]
+        w2v_model = Word2Vec(splitted_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
+        log_info('=> end training w2v model....')
         self.w2v_model = w2v_model
 
     def _make_tfidf_model(self, arr_title):
-        print('=> start training tfidf model....')
+        log_info('=> start training tfidf model....')
         vectorizer = TfidfVectorizer(encoding=u'utf-8', token_pattern='[가-힣a-zA-Z0-9]+', lowercase=False, min_df=1)
         vectorizer.fit_transform(arr_title)
-        print('=> end training tfidf model....')
+        log_info('=> end training tfidf model....')
         self.tfidf_model = vectorizer
 
     def _get_tfidf_feature_names(self):
@@ -158,7 +172,8 @@ class WVSGenerator():
 
         # get tfidf feature names()
         self.tfidf_feature_names = self._get_tfidf_feature_names()
-
+        
+        # multi-processing
         if n_worker > 1:
 
             # split arr with n chunks
@@ -166,7 +181,7 @@ class WVSGenerator():
             arr_chunks = np.array_split(arr_title, n_worker)
 
             # multi-processing
-            print('{0} process running...'.format(n_worker))
+            log_info('{0} process running...'.format(n_worker))
             pool = multiprocessing.Pool(processes = n_worker)
             results = pool.starmap(self._process_wvs, zip(arr_chunks, arr_process_num))
             pool.close()
@@ -179,7 +194,7 @@ class WVSGenerator():
 
         self.total_wvs = total_wvs
 
-        print('=> make_wvs process is done....')
+        log_info('=> make_wvs process is done....')
 
         return total_wvs
 
