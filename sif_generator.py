@@ -74,6 +74,17 @@ class SIFGenerator():
 
         return word_vector
 
+    def _get_word_weight(self, word):
+
+        try:
+            prob_word = self.word_freq_dict[word] / self.total_word_freq
+            word_weight = self.sif_parm / (self.sif_parm + prob_word)
+
+        except KeyError:
+            word_weight = 0
+
+        return word_weight
+
     def _make_word_freq_dict(self, arr_title):
 
         arr_token_list = list(map(lambda x : x.split(' '), arr_title))
@@ -83,13 +94,6 @@ class SIFGenerator():
 
     def _get_total_word_freq(self):
         return sum(self.word_freq_dict.values())
-
-    def _get_word_weight(self, word):
-
-        prob_word = self.word_freq_dict[word] / self.total_word_freq
-        word_weight = self.sif_parm / (self.sif_parm + prob_word)
-
-        return word_weight
 
     def _delete_first_singular_value_col(self, total_arr_wvs):
 
@@ -130,8 +134,8 @@ class SIFGenerator():
 
     def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
         log_info('=> start training w2v model....')
-        splited_token_list = [str_token.split(' ') for str_token in arr_title]
-        w2v_model = Word2Vec(splited_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
+        splitted_token_list = [str_token.split(' ') for str_token in arr_title]
+        w2v_model = Word2Vec(splitted_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
         log_info('=> end training w2v model....')
         self.w2v_model = w2v_model
 
