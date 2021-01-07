@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import json
 from collections import Counter
 
 from gensim.models import Word2Vec
@@ -24,10 +25,21 @@ def log_info(s):
 
     pass
 
+def file_to_json(path):
+    result = {}
+    with open(path, encoding='utf-8') as data_file:
+        result = json.load(data_file)
+    return result
+
+def json_to_file(path, json_data):
+    with open(path, 'w', encoding='utf-8') as data_file:
+        json.dump(json_data, data_file, indent=2, ensure_ascii=False)
+    pass
+
 #https://bab2min.tistory.com/631
 class SIFGenerator():
 
-    def __init__(self, w2v_model=None, word_freq_dict=None, sif_parm=0.001, vector_size=100, avg=True, norm=True):
+    def __init__(self, sif_parm=0.001, vector_size=200, avg=True, norm=True):
 
         self.scaler = MinMaxScaler()
 
@@ -38,10 +50,21 @@ class SIFGenerator():
 
         self.total_sif_wvs = None
 
-        self.w2v_model = w2v_model
-        self.word_freq_dict = word_freq_dict
+        self.w2v_model = None
+        self.word_freq_dict = None
         self.total_word_freq = None
 
+    def load_w2v_model(self, model_path):
+        self.w2v_model = Word2Vec.load(model_path)
+        pass
+    
+    def load_word_freq_dict(self, dict_path):
+
+        self.word_freq_dict = file_to_json(dict_path)
+        # get total word freq
+        self.total_word_freq = self._get_total_word_freq()
+        pass
+        
     def get_total_wvs(self):
         return self.total_sif_wvs
 
@@ -55,6 +78,10 @@ class SIFGenerator():
     def save_w2v_model(self, save_path):
         log_info('=> save w2v_model to {0}'.format(save_path))
         self.w2v_model.save(save_path)
+
+    def save_word_freq_dict(self, save_path):
+        log_info('=> save word_freq_dict to {0}'.format(save_path))
+        json_to_file(save_path, self.word_freq_dict)
 
     def _normalize(self, vector):
 
@@ -132,10 +159,10 @@ class SIFGenerator():
 
         return arr_sif_wvs
 
-    def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
+    def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=5):
         log_info('=> start training w2v model....')
         splitted_token_list = [str_token.split(' ') for str_token in arr_title]
-        w2v_model = Word2Vec(splitted_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
+        w2v_model = Word2Vec(splitted_token_list, size=200, window=window_size, min_count=min_count, workers=n_worker)
         log_info('=> end training w2v model....')
         self.w2v_model = w2v_model
 
@@ -143,6 +170,7 @@ class SIFGenerator():
     def make_sif_wvs_vector(self, query_title):
 
         arr_token = query_title.split(' ')
+
         sif_wvs_vector = np.zeros(shape=self.vector_size)
 
         for token in arr_token:

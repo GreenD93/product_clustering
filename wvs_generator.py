@@ -27,7 +27,7 @@ def log_info(s):
 
 class WVSGenerator():
 
-    def __init__(self, w2v_model=None, tfidf_model=None, vector_size=100, avg=True, norm=True):
+    def __init__(self, w2v_model=None, tfidf_model=None, vector_size=200, avg=True, norm=True):
 
         self.scaler = MinMaxScaler()
 
@@ -70,16 +70,16 @@ class WVSGenerator():
 
         return normalized_vector
 
-    def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=1):
+    def _make_w2v_model(self, arr_title, n_worker, window_size=5, min_count=5):
         log_info('=> start training w2v model....')
         splitted_token_list = [str_token.split(' ') for str_token in arr_title]
-        w2v_model = Word2Vec(splitted_token_list, size=100, window=window_size, min_count=min_count, workers=n_worker)
+        w2v_model = Word2Vec(splitted_token_list, size=200, window=window_size, min_count=min_count, workers=n_worker)
         log_info('=> end training w2v model....')
         self.w2v_model = w2v_model
 
     def _make_tfidf_model(self, arr_title):
         log_info('=> start training tfidf model....')
-        vectorizer = TfidfVectorizer(encoding=u'utf-8', token_pattern='[가-힣a-zA-Z0-9]+', lowercase=False, min_df=1)
+        vectorizer = TfidfVectorizer(token_pattern='\w+/\w+', max_df=4, lowercase=False)
         vectorizer.fit_transform(arr_title)
         log_info('=> end training tfidf model....')
         self.tfidf_model = vectorizer
